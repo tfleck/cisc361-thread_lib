@@ -1,30 +1,37 @@
 #include "t_lib.h"
 
 tQueue_t *running;
-tQueue_t *ready;
+tQueue_t *ready_high;
+tQueue_t *ready_low;
 
-void t_init()
-{
+int timeout = 10000;
+
+void t_init() {
+  sighold(SIGALRM);
+  init_alarm();
+
   //Initialize queues
-  ready = createQueue();
   running = createQueue();
+  ready_high = createQueue();
+  ready_low = createQueue();
 
   //Create TCB for main thread
   tcb_t *tmp = (tcb_t *) calloc(1,sizeof(tcb_t));
   tmp->thread_id = 0;
-  tmp->thread_priority = 0;
+  tmp->thread_priority = 1;
   tmp->thread_context = (ucontext_t *) calloc(1,sizeof(ucontext_t));
   if (getcontext(tmp->thread_context) == -1) {
     perror("getcontext");
     exit(EXIT_FAILURE);
   }
+
   //Add to running queue
   addQueue(running,tmp);
+  sigrelse(SIGALRM);
 }
 
-void t_create(void (*fct)(int), int id, int pri)
-{
-  if(ready != NULL){
+void t_create(void (*fct)(int), int id, int pri) {
+  if(ready_high != NULL && ready_low != NULL){
     tcb_t *tmp = (tcb_t *) calloc(1,sizeof(tcb_t));
     tmp->thread_id = id;
     tmp->thread_priority = pri;
@@ -35,7 +42,7 @@ void t_create(void (*fct)(int), int id, int pri)
       exit(EXIT_FAILURE);
     }
 
-    size_t sz = 0x10000;
+    size_t sz = 0x2000;
     tmp->thread_context->uc_stack.ss_sp = calloc(1,sz);
     //uc->uc_stack.ss_sp = mmap(0, sz,
     //     PROT_READ | PROT_WRITE | PROT_EXEC,
@@ -45,40 +52,86 @@ void t_create(void (*fct)(int), int id, int pri)
     tmp->thread_context->uc_link = running->head->thread_context; 
     makecontext(tmp->thread_context, (void (*)()) fct, 1, id);
     
-    addQueue(ready,tmp);
+    if(pri == 0){
+      addQueue(ready_high,tmp);
+    }
+    else{
+      addQueue(ready_low,tmp);
+    }
   }
 }
 
-void t_yield()
-{
-  if(ready != NULL && ready->head != NULL){
+void t_yield() {
+  sighold(SIGALRM);
+  if(running != NULL && ready_high != NULL && ready_low != NULL && (ready_high->head != NULL || ready_low->head != NULL)){
+    ualarm(0,0);
     tcb_t *tmp = rmQueue(running);
-    addQueue(running,rmQueue(ready));
-    addQueue(ready,tmp);
+    if(ready_high->head != NULL){
+      addQueue(running,rmQueue(ready_high));
+    }
+    else{
+      addQueue(running,rmQueue(ready_low));
+    }
+    if(tmp->thread_priority == 0){
+      addQueue(ready_high,tmp);
+    }
+    else{
+      addQueue(ready_low,tmp);
+    }
+    if(running->head == NULL){
+      perror("ready empty");
+      exit(EXIT_FAILURE);
+    }
+    ualarm(timeout,0);
     swapcontext(tmp->thread_context, running->head->thread_context);
   }
+  sigrelse(SIGALRM);
 }
 
-void t_terminate(){
-  if(running != NULL && ready != NULL){
+void t_terminate() {
+  sighold(SIGALRM);
+  if(running != NULL && ready_high != NULL && ready_low != NULL){
+    ualarm(0,0);
     tcb_t *tmp = rmQueue(running);
-    //printf("terminating id:%d\n",tmp->thread_id);
     free(tmp->thread_context->uc_stack.ss_sp);
     free(tmp->thread_context);
     free(tmp);
 
-    addQueue(running,rmQueue(ready));
+    if(ready_high->head != NULL){
+      addQueue(running,rmQueue(ready_high));
+    }
+    else{
+      addQueue(running,rmQueue(ready_low));
+    }
+    if(running->head == NULL){
+      perror("ready empty");
+      exit(EXIT_FAILURE);
+    }
+    ualarm(timeout,0);
     setcontext(running->head->thread_context);
   }
+  sigrelse(SIGALRM);
 }
 
-void t_shutdown(){
-  tcb_t *iter = ready->head;
+void t_shutdown() {
+  signal(SIGALRM,SIG_HOLD);
+  tcb_t *iter = ready_low->head;
   while(iter != NULL){
     tcb_t *tmp = iter;
     iter = iter->next;
-   // printf("freeing ready id:%d\n",tmp->thread_id);
-    free(tmp->thread_context->uc_stack.ss_sp);
+    if(tmp->thread_id > 0){
+      free(tmp->thread_context->uc_stack.ss_sp);
+    }
+    free(tmp->thread_context);
+    free(tmp);
+  }
+  iter = ready_high->head;
+  while(iter != NULL){
+    tcb_t *tmp = iter;
+    iter = iter->next;
+    if(tmp->thread_id > 0){
+      free(tmp->thread_context->uc_stack.ss_sp);
+    }
     free(tmp->thread_context);
     free(tmp);
   }
@@ -87,7 +140,6 @@ void t_shutdown(){
   while(iter != NULL){
     tcb_t *tmp = iter;
     iter = iter->next;
-    //printf("freeing running id:%d\n",tmp->thread_id);
     if(tmp->thread_id > 0){
       free(tmp->thread_context->uc_stack.ss_sp);
     }
@@ -95,19 +147,31 @@ void t_shutdown(){
     free(tmp);
   }
 
-  free(ready);
+  free(ready_low);
+  free(ready_high);
   free(running);
-  ready = NULL;
+  ready_low = NULL;
+  ready_high = NULL;
   running = NULL;
+  signal(SIGALRM,sig_handler);
 }
 
-tQueue_t* createQueue(){
+void sig_handler() {
+  t_yield();
+}
+
+void init_alarm() {
+  sigset(SIGALRM, sig_handler);
+  ualarm(timeout,0);
+}
+
+tQueue_t* createQueue() {
   tQueue_t *tmp = (tQueue_t *) calloc(1,sizeof(tQueue_t));
   tmp->head = tmp->tail = NULL;
   return tmp;
 }
 
-void addQueue(tQueue_t *q, tcb_t *t){
+void addQueue(tQueue_t *q, tcb_t *t) {
   if(q->tail == NULL){
     q->head = q->tail =  t;
     q->tail->next = NULL;
@@ -119,7 +183,7 @@ void addQueue(tQueue_t *q, tcb_t *t){
   }
 }
 
-tcb_t* rmQueue(tQueue_t *q){
+tcb_t* rmQueue(tQueue_t *q) {
   if(q->head == NULL){
     return NULL;
   }

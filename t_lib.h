@@ -1,10 +1,16 @@
 /*
  * types used by thread library
  */
+#define _XOPEN_SOURCE 500
+
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 #include <ucontext.h>
 #include <sys/mman.h>
+#include <sys/types.h>
+#include <signal.h>
+#include <sys/time.h>
 
 typedef struct tcb_t
 {
@@ -27,6 +33,10 @@ void t_create(void(*function)(int), int thread_id, int priority);
 void t_yield();
 void t_terminate();
 void t_shutdown();
+
+//Internal scheduling fns
+void sig_handler();
+void init_alarm();
 
 //Internal queueing fns
 tQueue_t* createQueue();
