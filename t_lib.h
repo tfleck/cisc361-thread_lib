@@ -33,6 +33,8 @@ typedef struct sem_t
   tQueue_t *q;
 } sem_t;
 
+//External Funtions
+
 //Thread library fns
 void t_init();
 void t_create(void(*function)(int), int thread_id, int priority);
@@ -45,6 +47,8 @@ void sem_init(sem_t **sp, int sem_count);
 void sem_wait(sem_t *sp);
 void sem_signal(sem_t *sp);
 void sem_destroy(sem_t **sp);
+
+//Internal Functions
 
 //Internal scheduling fns
 void sig_handler();
