@@ -5,21 +5,21 @@ CFLAGS = -g -Wall -Wextra
 
 LIBOBJS = t_lib.o 
 
-TSTOBJS = test00.o test01.o test01a.o test01x.o test01-shone.o test01-sullivan.o test02.o test02a.o test02.o test07.o
+TSTOBJS = test00.o test01.o test01a.o test01x.o test01-shone.o test01-sullivan.o test02.o test02a.o test02.o test04.o test07.o test03.o test03-shone.o test03-phil.o test10.o 
 
 # specify the executable 
 
-EXECS = test00 test01 test01a test01x test01-shone test01-sullivan test02 test02a test04 test07
+EXECS = test00 test01 test01a test01x test01-shone test01-sullivan test02 test02a test04 test07 test03 test03-shone test03-phil test10
 
 # specify the source files
 
 LIBSRCS = t_lib.c
 
-TSTSRCS = test00.c test01.c test01a.c test01x.c test01-shone.c test01-sullivan.c test02.c test02a.c test04.c test07.c
+TSTSRCS = test00.c test01.c test01a.c test01x.c test01-shone.c test01-sullivan.c test02.c test02a.c test04.c test07.c test03.c test03-shone test03-phil test10
 
 #default target
 .DEFAULT_GOAL := all
-all: test00 test01 test01a test01x test01-shone test01-sullivan test02 test02a test04 test07
+all: test00 test01 test01a test01x test01-shone test01-sullivan test02 test02a test04 test07 test03 test03-shone test03-phil test10
 
 # ar creates the static thread library
 
@@ -91,6 +91,18 @@ test04: test04.o t_lib.a Makefile
 
 test07: test07.o t_lib.a Makefile
 	${CC} ${CFLAGS} test07.o t_lib.a -o test07
+	
+test03: test03.o t_lib.a Makefile
+	${CC} ${CFLAGS} test03.o t_lib.a -o test03
+	
+test03-shone: test03-shone.o t_lib.a Makefile
+	${CC} ${CFLAGS} test03-shone.o t_lib.a -o test03-shone
+	
+test03-phil: test03-phil.o t_lib.a Makefile
+	${CC} ${CFLAGS} test03-phil.o t_lib.a -o test03-phil
+	
+test10: test10.o t_lib.a Makefile
+	${CC} ${CFLAGS} test10.o t_lib.a -o test10
 
 clean:
 	rm -f t_lib.a ${EXECS} ${LIBOBJS} ${TSTOBJS} 

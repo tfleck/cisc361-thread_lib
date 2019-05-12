@@ -90,7 +90,7 @@ void t_yield() {
 
 void t_terminate() {
   sighold(SIGALRM);
-  if(running != NULL && ready_high != NULL && ready_low != NULL){
+  if(running != NULL && ready_high != NULL && ready_low != NULL && (ready_high->head != NULL || ready_low->head != NULL)){
     ualarm(0,0);
     tcb_t *tmp = rmQueue(running);
     free(tmp->thread_context->uc_stack.ss_sp);
@@ -114,46 +114,119 @@ void t_terminate() {
 }
 
 void t_shutdown() {
-  signal(SIGALRM,SIG_HOLD);
-  tcb_t *iter = ready_low->head;
-  while(iter != NULL){
-    tcb_t *tmp = iter;
-    iter = iter->next;
-    if(tmp->thread_id > 0){
-      free(tmp->thread_context->uc_stack.ss_sp);
+  sighold(SIGALRM);
+  if(ready_low != NULL){
+    tcb_t *iter = ready_low->head;
+    while(iter != NULL){
+      tcb_t *tmp = iter;
+      iter = iter->next;
+      if(tmp->thread_id > 0){
+        free(tmp->thread_context->uc_stack.ss_sp);
+      }
+      free(tmp->thread_context);
+      free(tmp);
     }
-    free(tmp->thread_context);
-    free(tmp);
+    free(ready_low);
   }
-  iter = ready_high->head;
-  while(iter != NULL){
-    tcb_t *tmp = iter;
-    iter = iter->next;
-    if(tmp->thread_id > 0){
-      free(tmp->thread_context->uc_stack.ss_sp);
+  if(ready_high != NULL){
+    tcb_t *iter = ready_high->head;
+    while(iter != NULL){
+      tcb_t *tmp = iter;
+      iter = iter->next;
+      if(tmp->thread_id > 0){
+        free(tmp->thread_context->uc_stack.ss_sp);
+      }
+      free(tmp->thread_context);
+      free(tmp);
     }
-    free(tmp->thread_context);
-    free(tmp);
+    free(ready_high);
   }
-  
-  iter = running->head;
-  while(iter != NULL){
-    tcb_t *tmp = iter;
-    iter = iter->next;
-    if(tmp->thread_id > 0){
-      free(tmp->thread_context->uc_stack.ss_sp);
+  if(running != NULL){
+    tcb_t *iter = running->head;
+    while(iter != NULL){
+      tcb_t *tmp = iter;
+      iter = iter->next;
+      if(tmp->thread_id > 0){
+        free(tmp->thread_context->uc_stack.ss_sp);
+      }
+      free(tmp->thread_context);
+      free(tmp);
     }
-    free(tmp->thread_context);
-    free(tmp);
+    free(running);
   }
-
-  free(ready_low);
-  free(ready_high);
-  free(running);
   ready_low = NULL;
   ready_high = NULL;
   running = NULL;
-  signal(SIGALRM,sig_handler);
+  sigrelse(SIGALRM);
+}
+
+void sem_init(sem_t **sp, int sem_count) {
+    *sp = calloc(1,sizeof(sem_t));
+    (*sp)->count = sem_count;
+    (*sp)->q = createQueue();
+}
+
+void sem_wait(sem_t *sp) {
+ //Ignore timer
+  sighold(SIGALRM);
+
+  sp->count --;
+  if(sp->count < 0){
+    if(running != NULL && ready_high != NULL && ready_low != NULL && (ready_high->head != NULL || ready_low->head != NULL)){
+      ualarm(0,0);
+      tcb_t *tmp = rmQueue(running);
+      addQueue(sp->q,tmp);
+      if(ready_high->head != NULL){
+        addQueue(running,rmQueue(ready_high));
+      }
+      else{
+        addQueue(running,rmQueue(ready_low));
+      }
+      ualarm(timeout,0);
+      swapcontext(tmp->thread_context, running->head->thread_context);
+    }    
+  }
+  sigrelse(SIGALRM);
+}
+
+void sem_signal(sem_t *sp) {
+  //Ignore timer
+  sighold(SIGALRM);
+  
+  sp->count++;
+  if(sp->count <= 0){
+    if(running != NULL && ready_high != NULL && ready_low != NULL){
+      tcb_t *tmp = rmQueue(sp->q);
+      if(tmp->thread_priority == 0){
+        addQueue(ready_high,tmp);
+      }
+      else{
+        addQueue(ready_low,tmp);
+      }
+    }
+  }
+  sigrelse(SIGALRM);
+}
+
+void sem_destroy(sem_t **sp){
+  //Ignore timer
+  sighold(SIGALRM);
+  
+  //Move all threads waiting on semaphore into ready queues
+  tcb_t *iter = (*sp)->q->head;
+  while(iter != NULL){
+    tcb_t *tmp = iter;
+    iter = iter->next;
+    if(tmp->thread_priority == 0){
+      addQueue(ready_high,tmp);
+    }
+    else{
+      addQueue(ready_low,tmp);
+    }
+  }
+  free((*sp)->q);
+  free(*sp);
+  sigrelse(SIGALRM);  
 }
 
 void sig_handler() {
