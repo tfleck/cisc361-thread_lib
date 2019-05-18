@@ -5,21 +5,21 @@ CFLAGS = -g -Wall -Wextra
 
 LIBOBJS = t_lib.o 
 
-TSTOBJS = test00.o test01.o test01a.o test01x.o test01-shone.o test01-sullivan.o test02.o test02a.o test02.o test04.o test07.o test03.o test03-shone.o test03-phil.o test10.o test03-senzer.o
+TSTOBJS = test00.o test01.o test01a.o test01x.o test01-shone.o test01-sullivan.o test02.o test02a.o test02.o test04.o test07.o test03.o test03-shone.o test03-phil.o test10.o test03-senzer.o test06.o test05.o test08.o test09.o test11.o test04-senzer.o
 
 # specify the executable 
 
-EXECS = test00 test01 test01a test01x test01-shone test01-sullivan test02 test02a test04 test07 test03 test03-shone test03-phil test10 test03-senzer
+EXECS = test00 test01 test01a test01x test01-shone test01-sullivan test02 test02a test04 test07 test03 test03-shone test03-phil test10 test03-senzer test06 test05 test08 test09 test11 test04-senzer
 
 # specify the source files
 
 LIBSRCS = t_lib.c
 
-TSTSRCS = test00.c test01.c test01a.c test01x.c test01-shone.c test01-sullivan.c test02.c test02a.c test04.c test07.c test03.c test03-shone.c test03-phil.c test10.c test03-senzer.c
+TSTSRCS = test00.c test01.c test01a.c test01x.c test01-shone.c test01-sullivan.c test02.c test02a.c test04.c test07.c test03.c test03-shone.c test03-phil.c test10.c test03-senzer.c test06.c test05.c test08.c test09.c test11.c test04-senzer.c
 
 #default target
 .DEFAULT_GOAL := all
-all: test00 test01 test01a test01x test01-shone test01-sullivan test02 test02a test04 test07 test03 test03-shone test03-phil test10 test03-senzer
+all: test00 test01 test01a test01x test01-shone test01-sullivan test02 test02a test04 test07 test03 test03-shone test03-phil test10 test03-senzer test06 test05 test08 test09 test11 test04-senzer
 
 # ar creates the static thread library
 
@@ -106,6 +106,24 @@ test10: test10.o t_lib.a Makefile
 	
 test03-senzer: test03-senzer.o t_lib.a Makefile
 	${CC} ${CFLAGS} test03-senzer.o t_lib.a -o test03-senzer
+	
+test06: test06.o t_lib.a Makefile
+	${CC} ${CFLAGS} test06.o t_lib.a -o test06
+	
+test05: test05.o t_lib.a Makefile
+	${CC} ${CFLAGS} test05.o t_lib.a -o test05
+	
+test08: test08.o t_lib.a Makefile
+	${CC} ${CFLAGS} test08.o t_lib.a -o test08
+	
+test09: test09.o t_lib.a Makefile
+	${CC} ${CFLAGS} test09.o t_lib.a -o test09
+	
+test11: test11.o t_lib.a Makefile
+	${CC} ${CFLAGS} test11.o t_lib.a -o test11
+	
+test04-senzer: test04-senzer.o t_lib.a Makefile
+	${CC} ${CFLAGS} test04-senzer.o t_lib.a -o test04-senzer
 
 clean:
 	rm -f t_lib.a ${EXECS} ${LIBOBJS} ${TSTOBJS} 
